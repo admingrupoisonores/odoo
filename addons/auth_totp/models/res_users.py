@@ -6,6 +6,8 @@ import functools
 import logging
 import os
 import re
+import pytz
+from datetime import datetime
 
 from odoo import _, api, fields, models
 from odoo.addons.base.models.res_users import check_identity
@@ -58,7 +60,8 @@ class Users(models.Model):
     def _totp_check(self, code):
         sudo = self.sudo()
         key = base64.b32decode(sudo.totp_secret)
-        match = TOTP(key).match(code)
+        user_time = pytz.timezone(self.tz).localize(datetime.now()).timestamp()
+        match = TOTP(key).match(code, t=user_time)
         if match is None:
             _logger.info("2FA check: FAIL for %s %r", self, self.login)
             raise AccessDenied(_("Verification failed, please double-check the 6-digit code"))
@@ -70,7 +73,8 @@ class Users(models.Model):
             return False
 
         secret = compress(secret).upper()
-        match = TOTP(base64.b32decode(secret)).match(code)
+        user_time = pytz.timezone(self.tz).localize(datetime.now()).timestamp()
+        match = TOTP(base64.b32decode(secret)).match(code, t=user_time)
         if match is None:
             _logger.info("2FA enable: REJECT CODE for %s %r", self, self.login)
             return False
